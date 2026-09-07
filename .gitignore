@@ -1,0 +1,12 @@
+node_modules
+build
+.terraform
+.terraform*
+terraform.*
+.env
+*.pem
+.aws/
+.ssh/
+.docker/
+.npm/
+.bash_history
