@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
         - name: tetris-v2
-          image: abmaxx/tetris-v2:latest
+          image: abmaxx/tetris-v2:379713f08828e45aa951a172ecf4bae1532dacf8
           ports:
             - containererPort: 80
