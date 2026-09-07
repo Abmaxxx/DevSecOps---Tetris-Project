@@ -1,24 +1,75 @@
-name: Echo Message and Slack Notification
+name: CI - Build, Scan, Push
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  echo-and-notify:
+  sonarcloud:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Echo a Message
-        run: echo "Hello from GitHub Actions!"
-
-      - name: Send a Slack Notification
-        if: always()
-        uses: act10ns/slack@v1
+      - uses: actions/checkout@v4
         with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#git'
+          fetch-depth: 0
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: .
+          args: >
+            -Dsonar.organization=abmaxxx
+            -Dsonar.projectKey=Abmaxxx_DevSecOps---Tetris-Project
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'tetris-v2'
+          path: '.'
+          format: 'HTML'
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: reports/
+
+  build-scan-push:
+    needs: [sonarcloud, dependency-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/tetris-v2:${{ github.sha }} .
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/tetris-v2:${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: 0
+
+      - name: Push image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/tetris-v2:${{ github.sha }}
+
+      - name: Update K8s manifest with new image tag
+        run: |
+          sed -i "s|image: .*tetris-v2:.*|image: ${{ secrets.DOCKERHUB_USERNAME }}/tetris-v2:${{ github.sha }}|" manifest-files/deployment.yml
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add manifest-files/deployment.yml
+          git commit -m "chore: update image tag to ${{ github.sha }}" || echo "no changes"
+          git push
