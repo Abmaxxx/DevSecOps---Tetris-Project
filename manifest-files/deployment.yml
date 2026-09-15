@@ -18,4 +18,4 @@ spec:
         - name: tetris-v2
           image: abmaxx/tetris-v2:latest
           ports:
-            - containererPort: 80
+            - containerPort: 80
