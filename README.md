@@ -12,6 +12,8 @@
 
 Welcome to an end-to-end DevSecOps pipeline, built from scratch: a Tetris game, containerized, scanned, and deployed to AWS EKS — with every step from `git push` to a live public URL fully automated. 🎮🔒☁️
 
+![CI/CD Pipeline Architecture](./Tetris DevOps CI_CD Architecture.png)
+
 ---
 
 ## 📂 Directories
